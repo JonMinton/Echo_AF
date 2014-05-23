@@ -1,0 +1,6 @@
+Need to rerun warfarin analysis to change treatment threshold to C=1
+
+F, 65 (MAIN) [DONE]
+F, 50 [DONE]
+M, 65 [DONE]
+M, 50 [DONE]
