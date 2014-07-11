@@ -10,22 +10,24 @@
 
 # From Providencia
 # now with selectedly added prior
-chads_data <- data.frame(
-    score = c(0, 1),
-    events = c(2.5, 17),
-    total = c(25, 79)
+providencia_data <- data.frame(
+    instrument=c(
+        "chads2", "chads2",
+        "chadsvasc", "chadsvasc"),
+    score=c(0, 1,
+            0, 1),
+    events=c(
+        2.5, 17,
+        0.5, 1.5
+        ),
+    total=c(
+        25, 79,
+        12, 21
+        )
 )
 
-chadsvasc_data <- data.frame(
-    score=c(0, 1),
-    events = c(0.5, 1.5),
-    total = c(12, 21)
-)
 
 
-# true high risk proportions for PSA 
-
-attach(CHADS.Data.prior)
 
 fn <- function(x, n_psa=1000){
     out <- rbeta(
@@ -33,21 +35,12 @@ fn <- function(x, n_psa=1000){
         shape1=x$total,
         shape2=x$total - x$events
         )
-    out <- t(out)
     return(out)
 }
 
-hrprop_c <- ddply(chads_data , .(score), fn)
-hrprop_c <- melt(hrprop_c, id.var="score", variable.name="psa")
-hrprop <- hrprop_c
-hrprop$instrument <- "chads2"
-hrprop <- arrange(hrprop, instrument, score, psa, value)
-
-hrprop_cv <- ddply(chadsvasc_data, .(score), fn)
-hrprop_cv <- melt(hrprop_cv, id.var="score", variable.name="psa")
-hrprop_cv$instrument <- "chadsvasc"
-hrprop_cv <- arrange(hrprop_cv, instrument, score, psa, value)
-hrprop <- rbind(hrprop, hrprop_cv)
+hrprop <- ddply(providencia_data , .(instrument, score), fn)
+hrprop <- melt(hrprop, id.vars=c("instrument", "score"), variable.name="psa")
+hrprop$psa <- str_replace(hrprop$psa, "V", "")
 
 write.csv(hrprop, file="Data/csv/proportion_high_risk.csv")
 
@@ -83,7 +76,18 @@ write.csv(hrprop, file="Data/csv/proportion_high_risk.csv")
 ################################################ P S A  D A T A ##################################################################
 # PSA Input data
 
-#PSA.inputs <- read.csv("PSA_data/PSA_Input_Data.csv")
+psa_inputs <- read.csv("Data/csv/PSA_Inputs_simplified.csv")
+names(psa_inputs) <- tolower(names(psa_inputs))
+psa_inputs$psa <- 1:dim(psa_inputs)[1]
+
+psa_inputs <- melt(psa_inputs, id.var="psa")
+
+tmp <- psa_inputs$variable
+psa_inputs$type <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+
+write.csv(psa_inputs, "data/csv/psa_inputs_long.csv")
+
+
 #PSA.inputs <- PSA.inputs[-c(1:2), -1]
 
 # append uncertainty in sens and spec onto PSA.inputs
@@ -122,45 +126,196 @@ names(spec.Exp) <- NULL
 ##########
 ##########
 
-PSA.inputs <- read.csv("PSA_Inputs_simplified.csv")
-
-sens.PSA <- PSA.inputs$Sens
-spec.PSA <- PSA.inputs$Spec
-
-hrProp.C0 <- PSA.inputs$hrProp.C0
-hrProp.C1 <- PSA.inputs$hrProp.C1
-
-hrProp.CV0 <- PSA.inputs$hrProp.CV0
-hrProp.CV1 <- PSA.inputs$hrProp.CV1
-
+fn <- function(x){
+    # The first . will separate the diagnostic population (e.g. tp) from other pieces of 
+    # variable information
+    tmp <- str_split(x, "[.]")
+    tmp <- tmp[[1]] # it will produce a list by default, but always of length 1
+    tmp <- tmp[-1] # remove the diag bit
+    out <- paste(tmp, collapse="_") # combine the rest
+    return(out)
+}
 # Warfarin
 
 # 50_F
-Data.WarfC0_50_F <- read.csv("W_50_F.csv")
+raw_data <- read.csv("Data/csv/W_50_F.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id.var=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="female"
+data_long$drug="warfarin"
+data_long$age=50
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+data_tidy <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+
+
+
 # 50_M
-Data.WarfC0_50_M <- read.csv("W_50_M.csv")
+raw_data <- read.csv("Data/csv/W_50_M.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="male"
+data_long$drug="warfarin"
+data_long$age=50
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
+
 # 65_F
-Data.WarfC0_65_F <- read.csv("W_65_F.csv")
+raw_data <- read.csv("Data/csv/W_65_F.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="female"
+data_long$drug="warfarin"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
 # 65_M
-Data.WarfC0_65_M <- read.csv("W_65_M.csv")
+raw_data <- read.csv("Data/csv/W_65_M.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="male"
+data_long$drug="warfarin"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
 
 # Rivaroxaban
 
 # 50_F
-Data.RivC0_50_F <- read.csv("R_50_F.csv")
+raw_data <- read.csv("Data/csv/R_50_F.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="female"
+data_long$drug="rivaroxaban"
+data_long$age=50
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
+
+
 # 50_M
-Data.RivC0_50_M <- read.csv("R_50_M.csv")
+raw_data <- read.csv("Data/csv/R_50_M.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="male"
+data_long$drug="rivaroxaban"
+data_long$age=50
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
 # 65_F
-Data.RivC0_65_F <- read.csv("R_65_F.csv")
+raw_data <- read.csv("Data/csv/R_65_F.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="female"
+data_long$drug="rivaroxaban"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
 # 65_M
-Data.RivC0_65_M <- read.csv("R_65_M.csv")
+raw_data <- read.csv("Data/csv/R_65_M.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="male"
+data_long$drug="rivaroxaban"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
 
 # Dabigatran
 
 # 65_F
-Data.DabC0_65_F <- read.csv("D_65_F.csv")
+raw_data <- read.csv("Data/csv/D_65_F.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="female"
+data_long$drug="dabigatran"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
 # 65_M
-Data.DabC0_65_M <- read.csv("D_65_M.csv")
+raw_data <- read.csv("Data/csv/D_65_M.csv")
+names(raw_data) <- tolower(names(raw_data))
+data_long <- melt(raw_data, id=c("run"))
+tmp <- data_long$variable
+data_long$diag <- word(tmp, start=1, sep=".", end=str_locate(tmp, "[.$]")[,1])
+data_long$instrument="chads2"
+data_long$risk_score=0
+data_long$sex="male"
+data_long$drug="dabigatran"
+data_long$age=65
+data_long$measure <- sapply(data_long$variable, fn)
+data_long$variable <- NULL
+data_tidy.this <- dcast(data_long, drug + sex + age + diag + run ~ measure)
+data_tidy <- rbind(data_tidy, data_tidy.this)
+
+
+
+write.csv(data_tidy, file="Data/tidy/input_data_tidied.csv")
+#### Now to save the tidied data
 
 
 # #Warfarin

@@ -5,9 +5,18 @@ rm(list=ls())
 
 # Load packages
 
-require(MCMCpack)
-require(plyr)
-require(reshape2)
+source("Scripts/LoadPackages.R")
+
+RequiredPackages(
+    c(
+        "MCMCpack",
+        "plyr",
+        "reshape2",
+        "stringr",
+        "gdata"
+        )    
+    )
+
 
 # Load functions
 
